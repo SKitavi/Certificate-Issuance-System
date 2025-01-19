@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import Navbar from '../../components/Navbar'
 import { Toaster, toast } from 'react-hot-toast'
 import { certificateService } from '../../utils/contractinteraction'
+import { collection, addDoc } from "firebase/firestore"; // Import Firestore functions
+import { db } from "../../utils/firebase"; // Ensure your Firebase config file is correctly set up
 
 interface CertificateForm {
   recipientName: string;
@@ -51,48 +53,65 @@ export default function IssuerDashboard() {
     e.preventDefault()
     setIsLoading(true);
     try {
-      const txId = await certificateService.issueCertificate(formData.recipientName);
-      toast.success(`Certificate issued successfully! ID: ${txId}`);
+      // Add the certificate data to Firestore
+      const docRef = await addDoc(collection(db, "certificates"), {
+        recipientName: formData.recipientName,
+        recipientEmail: formData.recipientEmail,
+        certificateDetails: formData.certificateDetails,
+        issuedAt: new Date().toISOString(), // Optional: Timestamp of issuance
+      });
+      toast.success(`Certificate issued successfully! ID: ${docRef.id}`); // Notify with Firestore document ID
       setFormData({
-        recipientName: '',
-        recipientEmail: '',
-        certificateDetails: ''
+        recipientName: "",
+        recipientEmail: "",
+        certificateDetails: "",
       });
     } catch (err) {
-      console.error('Issue certificate error:', err);
-      toast.error('Failed to issue certificate');
+      console.error("Issue certificate error:", err);
+      toast.error("Failed to issue certificate");
     } finally {
       setIsLoading(false);
     }
-  }
+  };  
+  
+  import { getDoc, doc } from "firebase/firestore"; // Import Firestore query functions
 
   const handleVerifyCertificate = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     setIsLoading(true);
+  
     try {
-      const isValid = await certificateService.verifyCertificate(certificateId);
-      toast.success(`Certificate is ${isValid ? 'valid' : 'invalid'}`);
+      const docRef = doc(db, "certificates", certificateId); // Get the document reference
+      const docSnap = await getDoc(docRef); // Fetch the document
+  
+      if (docSnap.exists()) {
+        toast.success("Certificate is valid!");
+      } else {
+        toast.error("Certificate is invalid.");
+      }
     } catch (err) {
-      console.error('Verify certificate error:', err);
-      toast.error('Failed to verify certificate');
+      console.error("Verify certificate error:", err);
+      toast.error("Failed to verify certificate");
     } finally {
       setIsLoading(false);
     }
-  }
+  };
+  import { deleteDoc } from "firebase/firestore"; // Import Firestore delete function
 
   const handleRevokeCertificate = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     setIsLoading(true);
+  
     try {
-      await certificateService.revokeCertificate(certificateId);
-      toast.success('Certificate revoked successfully');
+      await deleteDoc(doc(db, "certificates", certificateId)); // Delete the document
+      toast.success("Certificate revoked successfully");
     } catch (err) {
-      console.error('Revoke certificate error:', err);
-      toast.error('Failed to revoke certificate');
+      console.error("Revoke certificate error:", err);
+      toast.error("Failed to revoke certificate");
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
   const [isWaitlisted] = useState(false);
   // if (!isWaitlisted) {
